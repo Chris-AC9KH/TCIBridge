@@ -45,14 +45,19 @@ from typing import Optional, Set
 
 import numpy as np
 import serial.tools.list_ports
+import sys
 try:
     import sounddevice as sd
 except Exception:
-    os.environ["PULSE_SERVER"] = "none"
+    sys.modules.pop("sounddevice", None)
+    os.environ["PULSE_SERVER"] = "/dev/null"
     os.environ["JACK_NO_START_SERVER"] = "1"
+    if os.path.exists("/usr/share/alsa/alsa.conf"):
+        os.environ["ALSA_CONFIG_PATH"] = "/usr/share/alsa/alsa.conf"
     try:
         import sounddevice as sd
     except Exception as _sd_err:
+        sys.modules.pop("sounddevice", None)
         sd = None
         print(f"Warning: sounddevice unavailable at import ({_sd_err})")
 import websockets

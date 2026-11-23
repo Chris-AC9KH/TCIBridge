@@ -66,6 +66,9 @@ User=tcibridge
 Group=tcibridge
 WorkingDirectory=/opt/tcibridge
 Environment=HOME=/var/lib/tcibridge
+Environment=PULSE_SERVER=/dev/null
+Environment=JACK_NO_START_SERVER=1
+Environment=ALSA_CONFIG_PATH=/usr/share/alsa/alsa.conf
 ExecStart=/opt/tcibridge/venv/bin/python /opt/tcibridge/TCI-bridge.py
 Restart=always
 RestartSec=3
