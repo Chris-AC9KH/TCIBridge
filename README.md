@@ -7,6 +7,7 @@ TCI Bridge exposes any Hamlib-supported transceiver and USB audio interface as a
 ## Features
 
 - **Rig-Agnostic CAT & PTT via Hamlib (`rigctld`)**: Supports hundreds of transceivers over USB serial, CI-V, or network CAT.
+  - *Note on Network-Connected Radios (e.g., Icom IC-7300Mk2/IC-705/IC-7610 over LAN or FlexRadio)*: Hamlib (`rigctld`) handles CAT control only (frequency, mode, PTT) and does not carry audio. To use network-connected radios with TCI Bridge, route the radio's audio through a local virtual audio device (such as **BlackHole** on macOS, **PulseAudio/PipeWire** virtual sinks on Linux, or **SmartSDR DAX** audio devices) and select that device in the Web Configuration UI.
 - **TCI 2.1 Protocol Server (`ws://0.0.0.0:50001`)**: Implements the core digital-mode TCI 2.1 specification (backward-compatible with TCI 1.8–2.1 clients), supporting `float32` and `int16` PCM audio (`8`–`48` kHz), per-client audio streams, isolated TX ownership, and automatic USB audio recovery after sleep or power cycles.
 - **Built-in Web Configuration UI (`http://0.0.0`)**: Mobile-friendly web UI for selecting transceiver model, serial port, baud rate, PTT mode, and USB audio device.
 - **Zero-Config Bonjour / mDNS Auto-Discovery**: Advertises `_tci._tcp` automatically via `dns-sd` (macOS) or `avahi-publish-service` (Linux).
