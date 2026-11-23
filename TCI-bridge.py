@@ -204,7 +204,7 @@ class HamlibRigController:
                         self.status_text = f'rigctld exited: {err or "check serial port"}'
                         log.error(self.status_text); return
                     try:
-                        self.reader, self.writer = await asyncio.open_connection('127.0.0.1', self.cfg.rigctld_port)
+                        self.reader, self.writer = await asyncio.open_connection('0.0.0.0', self.cfg.rigctld_port)
                         break
                     except OSError: continue
                 else:

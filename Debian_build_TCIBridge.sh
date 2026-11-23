@@ -69,7 +69,7 @@ Environment=HOME=/var/lib/tcibridge
 Environment=PULSE_SERVER=/dev/null
 Environment=JACK_NO_START_SERVER=1
 Environment=ALSA_CONFIG_PATH=/usr/share/alsa/alsa.conf
-ExecStart=/opt/tcibridge/venv/bin/python /opt/tcibridge/TCI-bridge.py
+ExecStart=/opt/tcibridge/venv/bin/python /opt/tcibridge/TCI-bridge.py --host 0.0.0.0
 Restart=always
 RestartSec=3
 
@@ -107,5 +107,5 @@ fi
 PRERM
 
 chmod 0755 "${BUILD_DIR}/DEBIAN/postinst" "${BUILD_DIR}/DEBIAN/prerm"
-dpkg-deb --build "${BUILD_DIR}"
+dpkg-deb --root-owner-group --build "${BUILD_DIR}"
 echo "Built: ${BUILD_DIR}.deb"
