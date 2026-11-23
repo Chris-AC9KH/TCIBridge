@@ -84,6 +84,22 @@ def _ensure_sd():
         sys.modules.pop("sounddevice", None)
     return sd
 
+def _find_alsa_pcm(name_hint: Optional[str]) -> Optional[str]:
+    if platform.system() != "Linux" or not shutil.which("arecord"):
+        return None
+    target = (name_hint or "usb audio codec").lower()
+    try:
+        out = subprocess.check_output(["arecord", "-l"], text=True, stderr=subprocess.DEVNULL)
+    except Exception:
+        return None
+    for line in out.splitlines():
+        m = re.match(r"^card\s+(\d+):\s*(\S+)\s+\[([^\]]+)\],\s*device\s+(\d+):", line)
+        if m:
+            card_id, card_name, dev_num = m.group(2), m.group(3), m.group(4)
+            if target in card_name.lower() or target in card_id.lower() or target in f"plughw:{card_id},{dev_num}":
+                return f"plughw:{card_id},{dev_num}"
+    return None
+
 TCI_HEADER_FMT = "<16I"
 TCI_HEADER_SIZE = 64
 FORMAT_INT16 = 0
@@ -511,11 +527,74 @@ class TCIBridgeServer:
                 await self.broadcast_text(update)
             await asyncio.sleep(0.35)
 
+    async def _emit_rx_and_tx_chrono(self, blk: np.ndarray, sr: int):
+        if not self.audio_clients:
+            return
+        nsamp = blk.shape[0] * 2
+        is_i16 = self.state.audio_sample_type == "int16"
+        fmt = FORMAT_INT16 if is_i16 else FORMAT_FLOAT32
+        pcm = (np.clip(blk, -1.0, 1.0) * 32767.0).astype("<i2").tobytes() if is_i16 else blk.astype("<f4").tobytes()
+        hdr = struct.pack(TCI_HEADER_FMT, 0, sr, fmt, 0, 0, nsamp, STREAM_RX_AUDIO, 2, self.rx_cnt, 0, 0, 0, 0, 0, 0, 0)
+        self.rx_cnt = (self.rx_cnt + 1) & 0xFFFFFFFF
+        await asyncio.gather(*(c.send(hdr + pcm) for c in list(self.audio_clients)), return_exceptions=True)
+        if self.state.tx and self.tx_owner:
+            chdr = struct.pack(TCI_HEADER_FMT, 0, sr, fmt, 0, 0, nsamp, STREAM_TX_CHRONO, 2, self.tx_cnt, 0, 0, 0, 0, 0, 0, 0)
+            self.tx_cnt = (self.tx_cnt + 1) & 0xFFFFFFFF
+            await asyncio.gather(*(c.send(chdr + pcm) for c in list(self.audio_clients)), return_exceptions=True)
+
+    async def _alsa_audio_step(self):
+        sr = self.state.sample_rate
+        blocksize = int(sr * 0.05)
+        pcm_dev = _find_alsa_pcm(self.cfg.audio_device)
+        if not pcm_dev or self.cfg.rig_model == 1:
+            await asyncio.sleep(2.0)
+            return
+        rx_proc = await asyncio.create_subprocess_exec(
+            "arecord", "-q", "-D", pcm_dev, "-f", "S16_LE", "-r", str(sr), "-c", "2", "-t", "raw",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
+        )
+        tx_proc = await asyncio.create_subprocess_exec(
+            "aplay", "-q", "-D", pcm_dev, "-f", "S16_LE", "-r", str(sr), "-c", "2", "-t", "raw",
+            stdin=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
+        )
+        log.info(f"ALSA audio bridge running @ {sr} Hz on {pcm_dev}")
+        nbytes = blocksize * 4
+        silence = bytes(nbytes)
+        tx_res = np.zeros((0, 2), dtype=np.float32)
+        active_pref = self.cfg.audio_device
+        try:
+            while sr == self.state.sample_rate and active_pref == self.cfg.audio_device and rx_proc.stdout:
+                raw = await asyncio.wait_for(rx_proc.stdout.readexactly(nbytes), timeout=2.0)
+                blk = np.frombuffer(raw, dtype="<i2").reshape(-1, 2).astype(np.float32) / 32768.0
+                await self._emit_rx_and_tx_chrono(blk, sr)
+                while len(tx_res) < blocksize:
+                    try:
+                        tx_res = np.vstack((tx_res, self.tx_queue.get_nowait()))
+                    except asyncio.QueueEmpty:
+                        break
+                if len(tx_res) >= blocksize:
+                    out_blk, tx_res = tx_res[:blocksize], tx_res[blocksize:]
+                    out_bytes = (np.clip(out_blk, -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
+                else:
+                    out_bytes = silence
+                if tx_proc.stdin:
+                    tx_proc.stdin.write(out_bytes)
+                    await tx_proc.stdin.drain()
+        except Exception as e:
+            log.warning(f"ALSA audio stream restarted: {e}")
+        finally:
+            for proc in (rx_proc, tx_proc):
+                if proc.returncode is None:
+                    proc.terminate()
+
     async def audio_stream_loop(self):
         loop = asyncio.get_running_loop()
         while True:
             if _ensure_sd() is None:
-                await asyncio.sleep(5.0)
+                if platform.system() == "Linux":
+                    await self._alsa_audio_step()
+                else:
+                    await asyncio.sleep(5.0)
                 continue
             sr = self.state.sample_rate
             blocksize = int(sr * 0.05)
@@ -705,6 +784,15 @@ class WebConfigServer:
                 audio_names = sorted({d["name"] for d in sd.query_devices() if "BlackHole" not in d["name"]})
             except Exception:
                 audio_names = []
+        elif platform.system() == "Linux" and shutil.which("arecord"):
+            try:
+                out = subprocess.check_output(["arecord", "-l"], text=True, stderr=subprocess.DEVNULL)
+                for line in out.splitlines():
+                    m = re.match(r"^card\s+(\d+):\s*(\S+)\s+\[([^\]]+)\],\s*device\s+(\d+):", line)
+                    if m:
+                        audio_names.append(f"{m.group(3)} (plughw:{m.group(2)},{m.group(4)})")
+            except Exception:
+                pass
         audio_opts = '<option value="">Auto-detect ("USB Audio CODEC")</option>\n' + "\n".join(
             f'<option value="{n}" {"selected" if n == cfg.audio_device else ""}>{n}</option>' for n in audio_names
         )

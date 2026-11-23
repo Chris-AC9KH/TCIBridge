@@ -47,7 +47,7 @@ Section: hamradio
 Priority: optional
 Architecture: arm64
 Maintainer: Chris Olson
-Depends: python3, python3-venv, python3-numpy, python3-serial, python3-websockets, libhamlib-utils, libportaudio2, avahi-utils
+Depends: python3, python3-venv, python3-numpy, python3-serial, python3-websockets, libhamlib-utils, libportaudio2, alsa-utils, avahi-utils
 Description: Hamlib USB Audio to TCI 2.1 Network Bridge
  Exposes any Hamlib-supported transceiver and USB audio interface as a
  TCI 2.1 server over the local network with Bonjour/mDNS discovery
