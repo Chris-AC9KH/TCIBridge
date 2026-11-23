@@ -319,6 +319,8 @@ class TCIBridgeServer:
     @staticmethod
     def _resolve_audio_device(name_hint: Optional[str]):
         target = (name_hint or "usb audio codec").lower()
+        if sd is None:
+            return None
         sd._terminate()
         sd._initialize()
         in_idx = out_idx = None
