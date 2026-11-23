@@ -503,7 +503,7 @@ class TCIBridgeServer:
     async def audio_stream_loop(self):
         loop = asyncio.get_running_loop()
         while True:
-            if sd is None:
+            if _ensure_sd() is None:
                 await asyncio.sleep(5.0)
                 continue
             sr = self.state.sample_rate
