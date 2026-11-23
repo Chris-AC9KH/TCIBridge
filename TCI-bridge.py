@@ -339,8 +339,14 @@ class TCIBridgeServer:
         target = (name_hint or "usb audio codec").lower()
         if _ensure_sd() is None:
             return None
-        sd._terminate()
-        sd._initialize()
+        try:
+            sd._terminate()
+        except Exception:
+            pass
+        try:
+            sd._initialize()
+        except Exception:
+            pass
         in_idx = out_idx = None
         for idx, dev in enumerate(sd.query_devices()):
             name = dev["name"].lower()
