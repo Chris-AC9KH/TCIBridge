@@ -67,21 +67,20 @@ from websockets.asyncio.server import ServerConnection as WebSocketServerProtoco
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("tci-bridge")
 
+_sd_checked = False
 def _ensure_sd():
-    global sd
-    if sd is not None:
+    global sd, _sd_checked
+    if _sd_checked:
         return sd
-    sys.modules.pop("sounddevice", None)
-    os.environ["PULSE_CLIENTCONFIG"] = "/dev/null"
-    os.environ["PULSE_SERVER"] = "none"
-    os.environ["JACK_NO_START_SERVER"] = "1"
-    if os.path.exists("/usr/share/alsa/alsa.conf"):
-        os.environ["ALSA_CONFIG_PATH"] = "/usr/share/alsa/alsa.conf"
+    _sd_checked = True
     try:
-        import sounddevice as _sd
-        sd = _sd
+        if sd is None:
+            import sounddevice as _sd
+            sd = _sd
+        sd.query_devices()
     except Exception:
         sys.modules.pop("sounddevice", None)
+        sd = None
     return sd
 
 def _find_alsa_pcm(name_hint: Optional[str]) -> Optional[str]:
