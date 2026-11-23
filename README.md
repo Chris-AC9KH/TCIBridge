@@ -33,7 +33,7 @@ pip3 install numpy pyserial sounddevice websockets
 ```bash
 sudo apt update && sudo apt install -y libhamlib-utils libportaudio2 avahi-utils python3-pip
 pip3 install --user numpy pyserial sounddevice websockets
-sudo usermod -aG dialout,audio \$USER
+sudo usermod -aG dialout,audio $USER
 ```
 
 ## Quick Start
