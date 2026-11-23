@@ -45,7 +45,16 @@ from typing import Optional, Set
 
 import numpy as np
 import serial.tools.list_ports
-import sounddevice as sd
+try:
+    import sounddevice as sd
+except Exception:
+    os.environ["PULSE_SERVER"] = "none"
+    os.environ["JACK_NO_START_SERVER"] = "1"
+    try:
+        import sounddevice as sd
+    except Exception as _sd_err:
+        sd = None
+        print(f"Warning: sounddevice unavailable at import ({_sd_err})")
 import websockets
 from websockets.asyncio.server import ServerConnection as WebSocketServerProtocol
 
@@ -470,6 +479,9 @@ class TCIBridgeServer:
     async def audio_stream_loop(self):
         loop = asyncio.get_running_loop()
         while True:
+            if sd is None:
+                await asyncio.sleep(5.0)
+                continue
             sr = self.state.sample_rate
             blocksize = int(sr * 0.05)
             if self.audio_dev_idx is None and self.cfg.rig_model != 1:
