@@ -553,7 +553,7 @@ class TCIBridgeServer:
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
         )
         tx_proc = await asyncio.create_subprocess_exec(
-            "aplay", "-q", "-D", pcm_dev, "-f", "S16_LE", "-r", str(sr), "-c", "2", "-t", "raw",
+            "aplay", "-q", "-D", pcm_dev, "--buffer-time=60000", "-f", "S16_LE", "-r", str(sr), "-c", "2", "-t", "raw",
             stdin=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
         )
         log.info(f"ALSA audio bridge running @ {sr} Hz on {pcm_dev}")
@@ -574,6 +574,9 @@ class TCIBridgeServer:
                 if len(tx_res) >= blocksize:
                     out_blk, tx_res = tx_res[:blocksize], tx_res[blocksize:]
                     out_bytes = (np.clip(out_blk, -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
+                    if not getattr(self, "_alsa_tx_logged", False):
+                        self._alsa_tx_logged = True
+                        log.info(f"ALSA TX audio streaming to {pcm_dev}")
                 else:
                     out_bytes = silence
                 if tx_proc.stdin:

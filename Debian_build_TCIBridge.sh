@@ -103,6 +103,7 @@ if [ ! -d /opt/tcibridge/venv ]; then
 fi
 /opt/tcibridge/venv/bin/pip install --no-cache-dir --upgrade sounddevice
 
+amixer -c CODEC sset PCM 100% unmute >/dev/null 2>&1 || true
 systemctl daemon-reload
 systemctl enable tcibridge.service
 systemctl restart tcibridge.service
