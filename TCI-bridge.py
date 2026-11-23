@@ -66,6 +66,22 @@ from websockets.asyncio.server import ServerConnection as WebSocketServerProtoco
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("tci-bridge")
 
+def _ensure_sd():
+    global sd
+    if sd is not None:
+        return sd
+    sys.modules.pop("sounddevice", None)
+    os.environ["PULSE_SERVER"] = "/dev/null"
+    os.environ["JACK_NO_START_SERVER"] = "1"
+    if os.path.exists("/usr/share/alsa/alsa.conf"):
+        os.environ["ALSA_CONFIG_PATH"] = "/usr/share/alsa/alsa.conf"
+    try:
+        import sounddevice as _sd
+        sd = _sd
+    except Exception:
+        sys.modules.pop("sounddevice", None)
+    return sd
+
 TCI_HEADER_FMT = "<16I"
 TCI_HEADER_SIZE = 64
 FORMAT_INT16 = 0
@@ -321,7 +337,7 @@ class TCIBridgeServer:
         target = (name_hint or "usb audio codec").lower()
         if sd is None:
             return None
-        if sd is not None:
+        if _ensure_sd() is not None:
             sd._terminate()
             sd._initialize()
         in_idx = out_idx = None
@@ -669,10 +685,10 @@ class WebConfigServer:
         ptt_opts = "\n".join(
             f'<option value="{k}" {"selected" if k == cfg.ptt_type else ""}>{label}</option>' for k, label in ptts
         )
-        if sd is not None:
+        if _ensure_sd() is not None:
             sd._terminate()
             sd._initialize()
-        audio_names = sorted({d["name"] for d in sd.query_devices() if "BlackHole" not in d["name"]}) if sd is not None else []
+        audio_names = sorted({d["name"] for d in sd.query_devices() if "BlackHole" not in d["name"]}) if _ensure_sd() is not None else []
         audio_opts = '<option value="">Auto-detect ("USB Audio CODEC")</option>\n' + "\n".join(
             f'<option value="{n}" {"selected" if n == cfg.audio_device else ""}>{n}</option>' for n in audio_names
         )
