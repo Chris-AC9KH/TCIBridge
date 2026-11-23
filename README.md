@@ -8,8 +8,8 @@ TCI Bridge exposes any Hamlib-supported transceiver and USB audio interface as a
 
 - **Rig-Agnostic CAT & PTT via Hamlib (`rigctld`)**: Supports hundreds of transceivers over USB serial, CI-V, or network CAT.
   - *Note on Network-Connected Radios (e.g., Icom IC-7300Mk2/IC-705/IC-7610 over LAN or FlexRadio)*: Hamlib (`rigctld`) handles CAT control only (frequency, mode, PTT) and does not carry audio. To use network-connected radios with TCI Bridge, route the radio's audio through a local virtual audio device (such as **BlackHole** on macOS, **PulseAudio/PipeWire** virtual sinks on Linux, or **SmartSDR DAX** audio devices) and select that device in the Web Configuration UI.
-- **TCI 2.1 Protocol Server (`ws://0.0.0.0:50001`)**: Implements the core digital-mode TCI 2.1 specification (backward-compatible with TCI 1.8–2.1 clients), supporting `float32` and `int16` PCM audio (`8`–`48` kHz), per-client audio streams, isolated TX ownership, and automatic USB audio recovery after sleep or power cycles.
-- **Built-in Web Configuration UI (`http://0.0.0`)**: Mobile-friendly web UI for selecting transceiver model, serial port, baud rate, PTT mode, and USB audio device.
+- **TCI 2.1 Protocol Server**: Implements the core digital-mode TCI 2.1 specification (backward-compatible with TCI 1.8–2.1 clients), supporting `float32` and `int16` PCM audio (`8`–`48` kHz), per-client audio streams, isolated TX ownership, and automatic USB audio recovery after sleep or power cycles.
+- **Built-in Web Configuration UI (`http://localhost:58080`)**: Mobile-friendly web UI for selecting transceiver model, serial port, baud rate, PTT mode, and USB audio device.
 - **Zero-Config Bonjour / mDNS Auto-Discovery**: Advertises `_tci._tcp` automatically via `dns-sd` (macOS) or `avahi-publish-service` (Linux).
 - **Native macOS `.app` Wrapper**: Includes `Launcher.swift` and `Mac_build_TCIBridge.sh` for signed/notarized `.app` and `.dmg` builds.
 
@@ -23,6 +23,8 @@ TCI Bridge exposes any Hamlib-supported transceiver and USB audio interface as a
 
 ## Requirements
 
+Builds for Mac and Debian-based arm64 Raspberry Pi are in the Releases
+
 ### macOS (13.0 Ventura or newer)
 ```zsh
 xcode-select --install
@@ -30,12 +32,16 @@ brew install hamlib
 pip3 install numpy pyserial sounddevice websockets
 ```
 
+Simply download TCIBridge.app and run it like any other Mac application.
+
 ### Linux / Raspberry Pi
 ```bash
 sudo apt update && sudo apt install -y libhamlib-utils libportaudio2 avahi-utils python3-pip
 pip3 install --user numpy pyserial sounddevice websockets
 sudo usermod -aG dialout,audio $USER
 ```
+
+The .deb will install necessary dependencies and install a backgound daemon to run the server, configurable with the webpage-based applet.
 
 ## Quick Start
 
@@ -66,7 +72,7 @@ journalctl -u tcibridge -f
 
 ## Configuration & Logs
 
-- **Web Setup UI**: Open `http://localhost:50002` (or tap **Configure Bridge Rig & Audio** in **JS8Call-Mobile**).
+- **Web Setup UI**: Open `http://localhost:58080` (or tap **Configure Bridge Rig & Audio** in **JS8Call-Mobile**).
 - **Config File**: `~/Library/Application Support/TCIBridge/config.json` (macOS) or `~/.config/TCIBridge/config.json` (Linux).
 - **Log File**: `~/Library/Logs/TCIBridge/tci-bridge.log` (macOS) or `~/.local/state/TCIBridge/tci-bridge.log` (Linux).
 

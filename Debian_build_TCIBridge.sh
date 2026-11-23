@@ -51,7 +51,7 @@ Depends: python3, python3-venv, python3-numpy, python3-serial, python3-websocket
 Description: Hamlib USB Audio to TCI 2.1 Network Bridge
  Exposes any Hamlib-supported transceiver and USB audio interface as a
  TCI 2.1 server over the local network with Bonjour/mDNS discovery
- and a built-in web configuration UI on port 50002.
+ and a built-in web configuration UI on port 58080.
 CONTROL
 
 cat << 'SERVICE' > "${BUILD_DIR}/lib/systemd/system/tcibridge.service"
