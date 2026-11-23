@@ -321,8 +321,9 @@ class TCIBridgeServer:
         target = (name_hint or "usb audio codec").lower()
         if sd is None:
             return None
-        sd._terminate()
-        sd._initialize()
+        if sd is not None:
+            sd._terminate()
+            sd._initialize()
         in_idx = out_idx = None
         for idx, dev in enumerate(sd.query_devices()):
             name = dev["name"].lower()
@@ -668,8 +669,9 @@ class WebConfigServer:
         ptt_opts = "\n".join(
             f'<option value="{k}" {"selected" if k == cfg.ptt_type else ""}>{label}</option>' for k, label in ptts
         )
-        sd._terminate()
-        sd._initialize()
+        if sd is not None:
+            sd._terminate()
+            sd._initialize()
         audio_names = sorted({d["name"] for d in sd.query_devices() if "BlackHole" not in d["name"]})
         audio_opts = '<option value="">Auto-detect ("USB Audio CODEC")</option>\n' + "\n".join(
             f'<option value="{n}" {"selected" if n == cfg.audio_device else ""}>{n}</option>' for n in audio_names
@@ -728,7 +730,7 @@ class WebConfigServer:
                 writer.write(hdr.encode() + html)
             await writer.drain()
         except Exception:
-            pass
+            log.exception("Web UI error")
         finally:
             writer.close()
 
