@@ -672,7 +672,7 @@ class WebConfigServer:
         if sd is not None:
             sd._terminate()
             sd._initialize()
-        audio_names = sorted({d["name"] for d in sd.query_devices() if "BlackHole" not in d["name"]})
+        audio_names = sorted({d["name"] for d in sd.query_devices() if "BlackHole" not in d["name"]}) if sd is not None else []
         audio_opts = '<option value="">Auto-detect ("USB Audio CODEC")</option>\n' + "\n".join(
             f'<option value="{n}" {"selected" if n == cfg.audio_device else ""}>{n}</option>' for n in audio_names
         )
