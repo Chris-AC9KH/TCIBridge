@@ -50,7 +50,8 @@ try:
     import sounddevice as sd
 except Exception:
     sys.modules.pop("sounddevice", None)
-    os.environ["PULSE_SERVER"] = "/dev/null"
+    os.environ["PULSE_CLIENTCONFIG"] = "/dev/null"
+    os.environ["PULSE_SERVER"] = "none"
     os.environ["JACK_NO_START_SERVER"] = "1"
     if os.path.exists("/usr/share/alsa/alsa.conf"):
         os.environ["ALSA_CONFIG_PATH"] = "/usr/share/alsa/alsa.conf"
@@ -71,7 +72,8 @@ def _ensure_sd():
     if sd is not None:
         return sd
     sys.modules.pop("sounddevice", None)
-    os.environ["PULSE_SERVER"] = "/dev/null"
+    os.environ["PULSE_CLIENTCONFIG"] = "/dev/null"
+    os.environ["PULSE_SERVER"] = "none"
     os.environ["JACK_NO_START_SERVER"] = "1"
     if os.path.exists("/usr/share/alsa/alsa.conf"):
         os.environ["ALSA_CONFIG_PATH"] = "/usr/share/alsa/alsa.conf"
