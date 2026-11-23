@@ -348,7 +348,11 @@ class TCIBridgeServer:
         except Exception:
             pass
         in_idx = out_idx = None
-        for idx, dev in enumerate(sd.query_devices()):
+        try:
+            devs = sd.query_devices()
+        except Exception:
+            return None
+        for idx, dev in enumerate(devs):
             name = dev["name"].lower()
             if "blackhole" not in name and target in name:
                 if dev["max_input_channels"] > 0 and in_idx is None:
@@ -695,7 +699,12 @@ class WebConfigServer:
         if _ensure_sd() is not None:
             sd._terminate()
             sd._initialize()
-        audio_names = sorted({d["name"] for d in sd.query_devices() if "BlackHole" not in d["name"]}) if _ensure_sd() is not None else []
+        audio_names = []
+        if _ensure_sd() is not None:
+            try:
+                audio_names = sorted({d["name"] for d in sd.query_devices() if "BlackHole" not in d["name"]})
+            except Exception:
+                audio_names = []
         audio_opts = '<option value="">Auto-detect ("USB Audio CODEC")</option>\n' + "\n".join(
             f'<option value="{n}" {"selected" if n == cfg.audio_device else ""}>{n}</option>' for n in audio_names
         )

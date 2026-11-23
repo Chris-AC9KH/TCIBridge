@@ -69,7 +69,6 @@ Environment=HOME=/var/lib/tcibridge
 Environment=PULSE_CLIENTCONFIG=/dev/null
 Environment=PULSE_SERVER=none
 Environment=JACK_NO_START_SERVER=1
-Environment=ALSA_CONFIG_PATH=/usr/share/alsa/alsa.conf
 ExecStart=/opt/tcibridge/venv/bin/python /opt/tcibridge/TCI-bridge.py --host 0.0.0.0 --host 0.0.0.0
 Restart=always
 RestartSec=3
@@ -86,6 +85,16 @@ if ! id -u tcibridge >/dev/null 2>&1; then
     useradd --system --home-dir /var/lib/tcibridge --create-home --shell /usr/sbin/nologin tcibridge
 fi
 usermod -aG dialout,audio tcibridge
+cat << 'ASOUNDRC' > /var/lib/tcibridge/.asoundrc
+pcm.!default {
+    type plug
+    slave.pcm "sysdefault"
+}
+ctl.!default {
+    type hw
+    card 0
+}
+ASOUNDRC
 chown -R tcibridge:tcibridge /var/lib/tcibridge /opt/tcibridge
 
 if [ ! -d /opt/tcibridge/venv ]; then
