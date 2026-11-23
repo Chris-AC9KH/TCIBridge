@@ -335,11 +335,10 @@ class TCIBridgeServer:
     @staticmethod
     def _resolve_audio_device(name_hint: Optional[str]):
         target = (name_hint or "usb audio codec").lower()
-        if sd is None:
+        if _ensure_sd() is None:
             return None
-        if _ensure_sd() is not None:
-            sd._terminate()
-            sd._initialize()
+        sd._terminate()
+        sd._initialize()
         in_idx = out_idx = None
         for idx, dev in enumerate(sd.query_devices()):
             name = dev["name"].lower()
@@ -766,7 +765,7 @@ def start_mdns_advertiser(rig_name: str, tci_port: int, web_port: int) -> Option
 
 async def main():
     p = argparse.ArgumentParser(description="Hamlib USB to TCI 2.1 Bridge")
-    p.add_argument("--host", default="localhost")
+    p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=50001)
     p.add_argument("--web-port", type=int, default=58080)
     args = p.parse_args()
