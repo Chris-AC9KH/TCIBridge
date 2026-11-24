@@ -86,6 +86,32 @@ def _ensure_sd():
         sd = None
     return sd
 
+def _set_alsa_unity_gain(card_hint: Optional[str]):
+    if platform.system() != "Linux" or not shutil.which("amixer") or not card_hint:
+        return
+    card_num = None
+    m = re.search(r"(?:plughw|hw):(?:CARD=)?([^,)]+)", card_hint)
+    ident = m.group(1) if m else card_hint
+    if ident.isdigit():
+        card_num = ident
+    else:
+        try:
+            for line in Path("/proc/asound/cards").read_text(errors="ignore").splitlines():
+                cm = re.match(r"^\s*(\d+)\s+\[([^\]]+)\]:\s*(.+)$", line)
+                if cm and (ident.lower() in cm.group(2).lower() or ident.lower() in cm.group(3).lower()):
+                    card_num = cm.group(1)
+                    break
+        except Exception:
+            return
+    if card_num is not None:
+        for ctrl in ("PCM", "Speaker"):
+            subprocess.run(
+                ["amixer", "-q", "-c", card_num, "sset", ctrl, "100%", "unmute"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+
 def _find_alsa_pcm(name_hint: Optional[str]) -> Optional[str]:
     if platform.system() != "Linux" or not shutil.which("arecord"):
         return None
@@ -560,6 +586,7 @@ class TCIBridgeServer:
         if not pcm_dev or self.cfg.rig_model == 1:
             await asyncio.sleep(2.0)
             return
+        _set_alsa_unity_gain(pcm_dev)
         rx_proc = await asyncio.create_subprocess_exec(
             "arecord", "-q", "-D", pcm_dev, "-f", "S16_LE", "-r", str(sr), "-c", "2", "-t", "raw",
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
@@ -641,6 +668,12 @@ class TCIBridgeServer:
             if active_dev is not None:
                 kw["device"] = active_dev
             try:
+                if platform.system() == "Linux" and active_dev is not None and _ensure_sd() is not None:
+                    out_idx = active_dev[1] if isinstance(active_dev, tuple) else active_dev
+                    try:
+                        _set_alsa_unity_gain(sd.query_devices(out_idx)["name"])
+                    except Exception:
+                        pass
                 with sd.Stream(**kw):
                     log.info(f"Audio bridge running @ {sr} Hz on device {active_dev}")
                     stale_ticks = 0
