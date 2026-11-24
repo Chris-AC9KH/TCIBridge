@@ -43,7 +43,7 @@ for arg in "$@"; do
         --release|-r) RELEASE_BUILD=true ;;
         --dev|-d) RELEASE_BUILD=false ;;
         --help|-h)
-            echo "Usage: ./build_TCIBridge.sh [--release|--dev]"
+            echo "Usage: ./Mac_build_TCIBridge.sh [--release|--dev]"
             echo "  Env vars: DEV_ID='Developer ID Application: ...' NOTARY_PROFILE='notarytool-profile'"
             exit 0
             ;;
@@ -221,17 +221,50 @@ codesign --force --options runtime --timestamp --entitlements "$TMP_DIR/entitlem
 codesign --verify --strict --verbose=2 "$APP_DIR"
 
 if [[ "$RELEASE_BUILD" == true ]]; then
+    if ! command -v create-dmg >/dev/null 2>&1; then
+        echo "Error: create-dmg not found (brew install create-dmg)." >&2
+        exit 1
+    fi
+
+    # 1. Zip, notarize, and staple the .app bundle first
     ZIP_PATH="$SCRIPT_DIR/TCIBridge-macOS.zip"
     rm -f "$ZIP_PATH"
     ditto -c -k --keepParent "$APP_DIR" "$ZIP_PATH"
-    echo "==> Submitting $ZIP_PATH for Apple notarization (profile: $NOTARY_PROFILE)..."
+
+    echo "==> Submitting $APP_NAME for Apple notarization (profile: $NOTARY_PROFILE)..."
     xcrun notarytool submit "$ZIP_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
     xcrun stapler staple "$APP_DIR"
     spctl --assess --type execute --verbose=2 "$APP_DIR"
     rm -f "$ZIP_PATH"
-    ditto -c -k --keepParent "$APP_DIR" "$ZIP_PATH"
-    echo "==> Notarized and stapled! Distributable archive ready at: $ZIP_PATH"
+    
+    printf "review results then press Enter"
+    read dummy </dev/tty
+
+    # 2. Create and sign the .dmg containing the notarized/stapled .app
+    VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_DIR/Contents/Info.plist")"
+    RAW_DMG="$SCRIPT_DIR/TCI Bridge ${VERSION}.dmg"
+    FINAL_DMG="$SCRIPT_DIR/TCIBridge-${VERSION}-macOS.dmg"
+    rm -f "$RAW_DMG" "$FINAL_DMG"
+
+    if [[ -f "$SCRIPT_DIR/LICENSE" ]]; then
+        cp "$SCRIPT_DIR/LICENSE" "$SCRIPT_DIR/license.txt"
+    fi
+
+    echo "==> Creating DMG installer..."
+    create-dmg --overwrite --dmg-title="TCI Bridge ${VERSION}" "$APP_DIR" "$SCRIPT_DIR"
+    rm -f "$SCRIPT_DIR/license.txt"
+
+    if [[ -f "$RAW_DMG" ]]; then
+        mv "$RAW_DMG" "$FINAL_DMG"
+    fi
+
+    # 3. Notarize and staple the .dmg itself
+    echo "==> Submitting $FINAL_DMG for Apple notarization (profile: $NOTARY_PROFILE)..."
+    xcrun notarytool submit "$FINAL_DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+    xcrun stapler staple "$FINAL_DMG"
+    spctl --assess --type open --context context:primary-signature --verbose=2 "$FINAL_DMG"
+
+    echo "==> DONE! Notarized DMG ready at: $FINAL_DMG"
 else
     echo "==> Dev/local Developer ID signed build ready at: $APP_DIR"
 fi
-
