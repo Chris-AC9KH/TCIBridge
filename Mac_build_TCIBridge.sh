@@ -31,7 +31,7 @@ SCRIPT_DIR="${0:A:h}"
 APP_NAME="TCIBridge.app"
 APP_DIR="$SCRIPT_DIR/$APP_NAME"
 PY_SRC="$SCRIPT_DIR/TCI-bridge.py"
-BUNDLE_ID="com.hamshack.TCIBridge"
+BUNDLE_ID="com.chris-ac9kh.TCIBridge"
 
 # Set your Developer ID Application identity & notarytool keychain profile here (or override via env vars)
 DEV_ID="${DEV_ID:-$(security find-identity -v -p codesigning | awk -F'"' '/Developer ID Application/{print $2; exit}')}"
@@ -142,7 +142,7 @@ cat << 'PLIST' > "$APP_DIR/Contents/Info.plist"
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.hamshack.TCIBridge</string>
+    <string>com.chris-ac9kh.TCIBridge</string>
     <key>CFBundleName</key>
     <string>TCI Bridge</string>
     <key>CFBundleDisplayName</key>
@@ -150,7 +150,7 @@ cat << 'PLIST' > "$APP_DIR/Contents/Info.plist"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.1</string>
+    <string>1.0.2</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
