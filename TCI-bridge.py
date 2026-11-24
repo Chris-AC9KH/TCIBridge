@@ -222,25 +222,34 @@ class HamlibRigController:
                 log.error(self.status_text)
                 return
 
-            cmd = [rigctld, "-m", str(self.cfg.rig_model), "-t", str(self.cfg.rigctld_port)]
+            cmd = [rigctld, "-m", str(self.cfg.rig_model), "-T", "127.0.0.1", "-t", str(self.cfg.rigctld_port)]
             if self.cfg.rig_model != 1 and self.cfg.serial_port:
                 cmd += ["-r", self.cfg.serial_port, "-s", str(self.cfg.baud_rate)]
             if self.cfg.ptt_type and self.cfg.ptt_type != "RIG":
                 cmd += ["-P", self.cfg.ptt_type]
 
+            def _kill_with_parent():
+                if platform.system() == "Linux":
+                    import ctypes
+                    ctypes.CDLL("libc.so.6").prctl(1, signal.SIGTERM)
+
             log.info(f"Launching Hamlib: {' '.join(cmd)}")
             try:
                 self.proc = await asyncio.create_subprocess_exec(
-                    *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                    preexec_fn=_kill_with_parent if platform.system() == "Linux" else None,
                 )
                 for _ in range(16):
                     await asyncio.sleep(0.25)
                     if self.proc.returncode is not None:
-                        err = (await self.proc.stderr.read()).decode(errors='ignore').strip()
+                        out = (await self.proc.stdout.read()).decode(errors='ignore').strip().splitlines()
+                        err = out[-1] if out else ""
                         self.status_text = f'rigctld exited: {err or "check serial port"}'
                         log.error(self.status_text); return
                     try:
-                        self.reader, self.writer = await asyncio.open_connection('0.0.0.0', self.cfg.rigctld_port)
+                        self.reader, self.writer = await asyncio.open_connection('127.0.0.1', self.cfg.rigctld_port)
                         break
                     except OSError: continue
                 else:

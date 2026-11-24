@@ -69,6 +69,7 @@ Environment=HOME=/var/lib/tcibridge
 Environment=PULSE_CLIENTCONFIG=/dev/null
 Environment=PULSE_SERVER=none
 Environment=JACK_NO_START_SERVER=1
+ExecStartPre=-/usr/bin/pkill -u tcibridge -x rigctld
 ExecStart=/opt/tcibridge/venv/bin/python /opt/tcibridge/TCI-bridge.py --host 0.0.0.0 --host 0.0.0.0
 Restart=always
 RestartSec=3
