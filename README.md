@@ -25,14 +25,10 @@ TCI Bridge exposes any Hamlib-supported transceiver and USB audio interface as a
 
 Builds for Mac and Debian-based arm64 Raspberry Pi are in the Releases
 
-### macOS (13.0 Ventura or newer)
-```zsh
-xcode-select --install
-brew install hamlib
-pip3 install numpy pyserial sounddevice websockets
-```
+### macOS (Apple Silicon, macOS 13.0 Ventura or newer)
+**No external dependencies required.** The prebuilt `TCIBridge.app` / `.dmg` in Releases bundles a self-contained Python 3.12 runtime (`numpy`, `pyserial`, `sounddevice`, `websockets`) and Hamlib (`rigctld`/`rigctl`). Simply download `TCIBridge.app` and run it like any other Mac application.
 
-Simply download TCIBridge.app and run it like any other Mac application.
+*(If running `TCI-bridge.py` directly from source instead of the `.app` bundle, install `brew install hamlib` and `pip3 install numpy pyserial sounddevice websockets`.)*
 
 ### Linux / Raspberry Pi
 ```bash
@@ -51,6 +47,7 @@ python3 TCI-bridge.py
 ```
 
 ### Build macOS `TCIBridge.app`
+Requires [uv](https://astral.sh) and Homebrew (`brew install uv hamlib`, plus `create-dmg` for `--release`):
 ```zsh
 chmod +x Mac_build_TCIBridge.sh
 ./Mac_build_TCIBridge.sh --dev      # Local Developer ID build

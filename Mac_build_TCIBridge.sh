@@ -77,6 +77,58 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
 cp "$PY_SRC" "$APP_DIR/Contents/Resources/TCI-bridge.py"
+mkdir -p "$APP_DIR/Contents/Resources/hamlib/lib"
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+dest="$APP_DIR/Contents/Resources/python"
+uv python install --no-bin "cpython-3.12-macos-aarch64" --install-dir "$TMP_DIR/uv-arm64"
+cp -RL "$(find "$TMP_DIR/uv-arm64" -maxdepth 1 -name "cpython-*" | head -n 1)" "$dest"
+uv pip install --system --break-system-packages --python "$dest/bin/python3" --python-platform "aarch64-apple-darwin" --only-binary=:all: --no-cache numpy pyserial sounddevice websockets
+rm -rf "$dest/include" "$dest/share" "$dest/lib/python3.12/test"
+find "$dest" -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+
+HDEST="$APP_DIR/Contents/Resources/hamlib"
+fetch_formula_arm64() {
+    local pkg="$1"
+    local tag
+    tag="$(brew info --json=v2 "$pkg" | python3 -c '
+import json, sys
+files = next(iter(json.load(sys.stdin)["formulae"]))["bottle"]["stable"]["files"]
+tags = [t for t in files if t.startswith("arm64_")]
+print(next(iter(tags), ""))
+')"
+    [[ -n "$tag" ]] || { echo "Error: No arm64 bottle found for $pkg" >&2; exit 1; }
+    echo "==> Fetching $pkg bottle ($tag)..."
+    brew fetch --bottle-tag="$tag" "$pkg" >/dev/null
+    mkdir -p "$TMP_DIR/pkg-$pkg"
+    tar -xzf "$(brew --cache --bottle-tag="$tag" "$pkg")" -C "$TMP_DIR/pkg-$pkg"
+    local pdir
+    pdir="$(find "$TMP_DIR/pkg-$pkg/$pkg" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+    for b in rigctld rigctl; do
+        [[ -f "$pdir/bin/$b" ]] && cp "$pdir/bin/$b" "$HDEST/$b" && chmod +x "$HDEST/$b"
+    done
+    if [[ -d "$pdir/lib" ]]; then
+        cp -P "$pdir"/lib/*.dylib "$HDEST/lib/" 2>/dev/null || true
+    fi
+}
+
+fetch_formula_arm64 hamlib
+for dep_pkg in $(brew deps --installed hamlib 2>/dev/null || brew deps hamlib); do
+    fetch_formula_arm64 "$dep_pkg"
+done
+
+for f in "$HDEST/rigctld" "$HDEST/rigctl" "$HDEST"/lib/*.dylib; do
+    [[ -L "$f" ]] && continue; chmod u+w "$f"
+    [[ "$f" == *.dylib ]] && install_name_tool -id "@loader_path/$(basename "$f")" "$f"
+    otool -L "$f" | awk 'NR>1 {print $1}' | grep -E '^(/opt/homebrew|/usr/local|@@HOMEBREW)' | while read -r dep; do
+        db="$(basename "$dep")"
+        if [[ -e "$HDEST/lib/$db" ]]; then
+            [[ "$f" == *.dylib ]] && pfx="@loader_path" || pfx="@executable_path/lib"
+            install_name_tool -change "$dep" "$pfx/$db" "$f"
+        fi
+    done
+done
 
 cat << 'PLIST' > "$APP_DIR/Contents/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -109,8 +161,6 @@ cat << 'PLIST' > "$APP_DIR/Contents/Info.plist"
 </plist>
 PLIST
 
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
 
 swift - "$TMP_DIR/icon.png" << 'SWIFT_ICON'
 import AppKit
@@ -170,9 +220,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(withTitle: "Quit TCI Bridge", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         NSApp.mainMenu = mainMenu
-        guard let scriptPath = Bundle.main.path(forResource: "TCI-bridge", ofType: "py") else {
+        guard let scriptPath = Bundle.main.path(forResource: "TCI-bridge", ofType: "py"),
+              let resPath = Bundle.main.resourcePath else {
             NSApp.terminate(nil); return
         }
+        let bundledPy = URL(fileURLWithPath: resPath).appendingPathComponent("python/bin/python3")
         let logDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/TCIBridge")
         try? FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
         let logURL = logDir.appendingPathComponent("tci-bridge.log")
@@ -180,8 +232,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             FileManager.default.createFile(atPath: logURL.path, contents: nil)
         }
         let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-        proc.arguments = [scriptPath, "--host", "0.0.0.0", "--port", "50001"]
+        proc.executableURL = bundledPy
+        proc.arguments = ["-s", scriptPath, "--host", "0.0.0.0", "--port", "50001"]
         if let h = try? FileHandle(forWritingTo: logURL) {
             h.seekToEndOfFile(); proc.standardOutput = h; proc.standardError = h
         }
@@ -200,9 +252,7 @@ app.setActivationPolicy(.regular)
 app.run()
 SWIFT_MAIN
 
-swiftc -target arm64-apple-macos13.0 "$TMP_DIR/Launcher.swift" -o "$TMP_DIR/TCIBridge-arm64"
-swiftc -target x86_64-apple-macos13.0 "$TMP_DIR/Launcher.swift" -o "$TMP_DIR/TCIBridge-x86_64"
-lipo -create "$TMP_DIR/TCIBridge-arm64" "$TMP_DIR/TCIBridge-x86_64" -output "$APP_DIR/Contents/MacOS/TCIBridge"
+swiftc -target arm64-apple-macos13.0 "$TMP_DIR/Launcher.swift" -o "$APP_DIR/Contents/MacOS/TCIBridge"
 
 cat << 'ENT' > "$TMP_DIR/entitlements.plist"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -211,11 +261,21 @@ cat << 'ENT' > "$TMP_DIR/entitlements.plist"
 <dict>
     <key>com.apple.security.device.audio-input</key>
     <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
 </dict>
 </plist>
 ENT
 
 # Sign inside-out (never --deep): binary first with hardened runtime + audio-input entitlement, then bundle
+find "$APP_DIR/Contents/Resources" -type f ! -lname '*' | while read -r bin; do
+    if file -b "$bin" | grep -q "Mach-O"; then
+        chmod u+w "$bin"
+        codesign --force --options runtime --timestamp --entitlements "$TMP_DIR/entitlements.plist" --sign "$DEV_ID" "$bin"
+    fi
+done
 codesign --force --options runtime --timestamp --entitlements "$TMP_DIR/entitlements.plist" --sign "$DEV_ID" "$APP_DIR/Contents/MacOS/TCIBridge"
 codesign --force --options runtime --timestamp --entitlements "$TMP_DIR/entitlements.plist" --sign "$DEV_ID" "$APP_DIR"
 codesign --verify --strict --verbose=2 "$APP_DIR"
@@ -243,7 +303,7 @@ if [[ "$RELEASE_BUILD" == true ]]; then
     # 2. Create and sign the .dmg containing the notarized/stapled .app
     VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_DIR/Contents/Info.plist")"
     RAW_DMG="$SCRIPT_DIR/TCI Bridge ${VERSION}.dmg"
-    FINAL_DMG="$SCRIPT_DIR/TCIBridge-${VERSION}-macOS.dmg"
+    FINAL_DMG="$SCRIPT_DIR/TCIBridge-${VERSION}-macOS-arm64.dmg"
     rm -f "$RAW_DMG" "$FINAL_DMG"
 
     if [[ -f "$SCRIPT_DIR/LICENSE" ]]; then

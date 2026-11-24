@@ -198,6 +198,9 @@ class RadioState:
 
 
 def find_hamlib_bin(name: str) -> Optional[str]:
+    bundled = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hamlib", name)
+    if os.path.isfile(bundled) and os.access(bundled, os.X_OK):
+        return bundled
     found = shutil.which(name)
     if found:
         return found
