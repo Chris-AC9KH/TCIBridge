@@ -104,7 +104,11 @@ if [ ! -d /opt/tcibridge/venv ]; then
 fi
 /opt/tcibridge/venv/bin/pip install --no-cache-dir --upgrade sounddevice
 
-amixer -c CODEC sset PCM 100% unmute >/dev/null 2>&1 || true
+CODEC_CARD=$(awk '/USB Audio CODEC/ {print $1; exit}' /proc/asound/cards 2>/dev/null || true)
+if [ -n "$CODEC_CARD" ]; then
+    amixer -c "$CODEC_CARD" sset PCM 100% unmute >/dev/null 2>&1 || true
+    alsactl store "$CODEC_CARD" >/dev/null 2>&1 || true
+fi
 systemctl daemon-reload
 systemctl enable tcibridge.service
 systemctl restart tcibridge.service
