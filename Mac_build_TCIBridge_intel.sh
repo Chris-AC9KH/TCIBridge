@@ -77,6 +77,8 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
 cp "$PY_SRC" "$APP_DIR/Contents/Resources/TCI-bridge.py"
+[[ -f "$SCRIPT_DIR/LICENSE" ]] && cp "$SCRIPT_DIR/LICENSE" "$APP_DIR/Contents/Resources/LICENSE.txt"
+[[ -f "$SCRIPT_DIR/THIRD-PARTY-LICENSES.txt" ]] && cp "$SCRIPT_DIR/THIRD-PARTY-LICENSES.txt" "$APP_DIR/Contents/Resources/THIRD-PARTY-LICENSES.txt"
 mkdir -p "$APP_DIR/Contents/Resources/hamlib/lib"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT

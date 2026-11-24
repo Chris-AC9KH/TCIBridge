@@ -76,3 +76,6 @@ journalctl -u tcibridge -f
 ## License
 
 Copyright © 2026 Chris Olson. Licensed under the **BSD 3-Clause License**.
+
+### Third-Party Components
+Prebuilt macOS `.app` / `.dmg` releases bundle unmodified binaries from **Hamlib** (`GPLv2` / `LGPLv2.1`), **libusb** (`LGPLv2.1`), **libltdl** (`LGPLv2+`), **CPython** (`PSF-2.0`), and **PortAudio / Python packages** (`MIT` / `BSD-3-Clause`). See [`THIRD-PARTY-LICENSES.txt`](THIRD-PARTY-LICENSES.txt) for license details and corresponding source code links.

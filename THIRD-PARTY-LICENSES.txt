@@ -1,0 +1,32 @@
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
+
+TCIBridge itself is licensed under the BSD 3-Clause License (see LICENSE).
+The prebuilt macOS application bundle (TCIBridge.app) distributes the following
+unmodified third-party components:
+
+1. Hamlib (rigctld, rigctl, libhamlib)
+   - License: GNU General Public License v2.0 (GPLv2) / GNU Lesser General Public License v2.1 (LGPLv2.1)
+   - Source Code: https://github.com
+   - Written Offer: To obtain the corresponding source code for the exact Hamlib version
+     bundled in this binary distribution under GPLv2 Section 3, download the matching
+     release archive from https://github.com or open an issue/request
+     on the TCIBridge repository.
+
+2. libusb & libusb-compat
+   - License: GNU Lesser General Public License v2.1 (LGPLv2.1)
+   - Source Code: https://github.com
+
+3. GNU libltdl (libtool)
+   - License: GNU Lesser General Public License v2.0 or later (LGPLv2+)
+   - Source Code: https://gnu.org
+
+4. CPython (python-build-standalone)
+   - License: Python Software Foundation License Version 2 (PSF-2.0)
+   - Source Code: https://github.com
+
+5. Bundled Python Packages
+   - numpy: BSD 3-Clause License
+   - pyserial: BSD 3-Clause License
+   - sounddevice (and PortAudio): MIT License
+   - websockets: BSD 3-Clause License
+   - cffi & pycparser: MIT / BSD 3-Clause Licenses
