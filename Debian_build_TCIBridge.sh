@@ -28,7 +28,7 @@
 set -euo pipefail
 
 VERSION="1.0.1"
-ARCH="arm64"
+ARCH="$(dpkg --print-architecture)"
 PKG_NAME="tcibridge"
 BUILD_DIR="dist_deb/${PKG_NAME}_${VERSION}_${ARCH}"
 
@@ -40,12 +40,12 @@ mkdir -p "${BUILD_DIR}/lib/systemd/system"
 cp TCI-bridge.py "${BUILD_DIR}/opt/tcibridge/TCI-bridge.py"
 chmod 0755 "${BUILD_DIR}/opt/tcibridge/TCI-bridge.py"
 
-cat << 'CONTROL' > "${BUILD_DIR}/DEBIAN/control"
+cat << CONTROL > "${BUILD_DIR}/DEBIAN/control"
 Package: tcibridge
 Version: 1.0.1
 Section: hamradio
 Priority: optional
-Architecture: arm64
+Architecture: ${ARCH}
 Maintainer: Chris Olson
 Depends: python3, python3-venv, python3-numpy, python3-serial, python3-websockets, libhamlib-utils, libportaudio2, alsa-utils, avahi-utils
 Description: Hamlib USB Audio to TCI 2.1 Network Bridge
@@ -70,7 +70,7 @@ Environment=PULSE_CLIENTCONFIG=/dev/null
 Environment=PULSE_SERVER=none
 Environment=JACK_NO_START_SERVER=1
 ExecStartPre=-/usr/bin/pkill -u tcibridge -x rigctld
-ExecStart=/opt/tcibridge/venv/bin/python /opt/tcibridge/TCI-bridge.py --host 0.0.0.0 --host 0.0.0.0
+ExecStart=/opt/tcibridge/venv/bin/python /opt/tcibridge/TCI-bridge.py --host 0.0.0.0 --port 50001
 Restart=always
 RestartSec=3
 TimeoutStopSec=5
