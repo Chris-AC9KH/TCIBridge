@@ -27,7 +27,7 @@
 
 set -euo pipefail
 
-VERSION="1.0.1"
+VERSION="1.0.2"
 ARCH="$(dpkg --print-architecture)"
 PKG_NAME="tcibridge"
 BUILD_DIR="dist_deb/${PKG_NAME}_${VERSION}_${ARCH}"
@@ -42,7 +42,7 @@ chmod 0755 "${BUILD_DIR}/opt/tcibridge/TCI-bridge.py"
 
 cat << CONTROL > "${BUILD_DIR}/DEBIAN/control"
 Package: tcibridge
-Version: 1.0.1
+Version: 1.0.2
 Section: hamradio
 Priority: optional
 Architecture: ${ARCH}
