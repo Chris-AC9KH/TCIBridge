@@ -62,7 +62,10 @@ except Exception:
         sd = None
         print(f"Warning: sounddevice unavailable at import ({_sd_err})")
 import websockets
-from websockets.asyncio.server import ServerConnection as WebSocketServerProtocol
+try:
+    from websockets.asyncio.server import ServerConnection as WebSocketServerProtocol
+except ImportError:
+    from websockets.server import WebSocketServerProtocol
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("tci-bridge")
@@ -600,8 +603,9 @@ class TCIBridgeServer:
                 continue
             sr = self.state.sample_rate
             blocksize = int(sr * 0.05)
-            if self.audio_dev_idx is None and self.cfg.rig_model != 1:
-                self.audio_dev_idx = self._resolve_audio_device(self.cfg.audio_device)
+            if self.audio_dev_idx is None:
+                if self.cfg.rig_model != 1:
+                    self.audio_dev_idx = self._resolve_audio_device(self.cfg.audio_device)
                 await asyncio.sleep(1.5)
                 continue
             active_dev = self.audio_dev_idx
@@ -777,16 +781,8 @@ class WebConfigServer:
         ptt_opts = "\n".join(
             f'<option value="{k}" {"selected" if k == cfg.ptt_type else ""}>{label}</option>' for k, label in ptts
         )
-        if _ensure_sd() is not None:
-            sd._terminate()
-            sd._initialize()
         audio_names = []
-        if _ensure_sd() is not None:
-            try:
-                audio_names = sorted({d["name"] for d in sd.query_devices() if "BlackHole" not in d["name"]})
-            except Exception:
-                audio_names = []
-        elif platform.system() == "Linux" and shutil.which("arecord"):
+        if platform.system() == "Linux" and shutil.which("arecord"):
             try:
                 out = subprocess.check_output(["arecord", "-l"], text=True, stderr=subprocess.DEVNULL)
                 for line in out.splitlines():
@@ -795,6 +791,11 @@ class WebConfigServer:
                         audio_names.append(f"{m.group(3)} (plughw:{m.group(2)},{m.group(4)})")
             except Exception:
                 pass
+        elif _ensure_sd() is not None:
+            try:
+                audio_names = sorted({d["name"] for d in sd.query_devices() if "BlackHole" not in d["name"]})
+            except Exception:
+                audio_names = []
         audio_opts = '<option value="">Auto-detect ("USB Audio CODEC")</option>\n' + "\n".join(
             f'<option value="{n}" {"selected" if n == cfg.audio_device else ""}>{n}</option>' for n in audio_names
         )
@@ -851,6 +852,8 @@ class WebConfigServer:
                 hdr = f"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {len(html)}\r\n\r\n"
                 writer.write(hdr.encode() + html)
             await writer.drain()
+        except (asyncio.TimeoutError, ConnectionResetError, BrokenPipeError):
+            pass
         except Exception:
             log.exception("Web UI error")
         finally:
