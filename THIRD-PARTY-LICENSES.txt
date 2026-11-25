@@ -6,23 +6,23 @@ unmodified third-party components:
 
 1. Hamlib (rigctld, rigctl, libhamlib)
    - License: GNU General Public License v2.0 (GPLv2) / GNU Lesser General Public License v2.1 (LGPLv2.1)
-   - Source Code: https://github.com
+   - Source Code: https://github.com/hamlib/hamlib
    - Written Offer: To obtain the corresponding source code for the exact Hamlib version
      bundled in this binary distribution under GPLv2 Section 3, download the matching
-     release archive from https://github.com or open an issue/request
+     release archive from https://github.com/hamlib/hamlib or open an issue/request
      on the TCIBridge repository.
 
 2. libusb & libusb-compat
    - License: GNU Lesser General Public License v2.1 (LGPLv2.1)
-   - Source Code: https://github.com
+   - Source Code: https://github.com/libusb/libusb
 
 3. GNU libltdl (libtool)
    - License: GNU Lesser General Public License v2.0 or later (LGPLv2+)
-   - Source Code: https://gnu.org
+   - Source Code: https://www.gnu.org/software/libtool/
 
 4. CPython (python-build-standalone)
    - License: Python Software Foundation License Version 2 (PSF-2.0)
-   - Source Code: https://github.com
+   - Source Code: https://github.com/python/cpython
 
 5. Bundled Python Packages
    - numpy: BSD 3-Clause License
