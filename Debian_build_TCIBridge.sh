@@ -66,7 +66,10 @@ User=tcibridge
 Group=tcibridge
 WorkingDirectory=/opt/tcibridge
 Environment=HOME=/var/lib/tcibridge
+Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PULSE_CLIENTCONFIG=/dev/null
+LogRateLimitIntervalSec=60s
+LogRateLimitBurst=15
 Environment=PULSE_SERVER=none
 Environment=JACK_NO_START_SERVER=1
 ExecStartPre=-/usr/bin/pkill -u tcibridge -x rigctld

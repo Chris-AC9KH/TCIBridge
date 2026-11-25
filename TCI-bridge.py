@@ -67,7 +67,36 @@ try:
 except ImportError:
     from websockets.server import WebSocketServerProtocol
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+import gzip
+from logging.handlers import RotatingFileHandler
+
+def _setup_logging():
+    debug = os.environ.get("TCIBRIDGE_DEBUG", "").lower() in ("1", "true", "yes")
+    level = logging.DEBUG if debug else logging.INFO
+    fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+    root = logging.getLogger()
+    root.setLevel(level)
+    root.handlers.clear()
+
+    # If launched from TCIBridge.app (stdout redirected to tci-bridge.log), use rotating .gz log
+    log_path = Path.home() / "Library" / "Logs" / "TCIBridge" / "tci-bridge.log"
+    if not sys.stdout.isatty() and platform.system() == "Darwin":
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        fh = RotatingFileHandler(log_path, maxBytes=256 * 1024, backupCount=3)
+        fh.setFormatter(fmt)
+        fh.namer = lambda name: name + ".gz"
+        def _rotator(source, dest):
+            with open(source, "rb") as sf, gzip.open(dest, "wb") as df:
+                df.writelines(sf)
+            os.remove(source)
+        fh.rotator = _rotator
+        root.addHandler(fh)
+    else:
+        sh = logging.StreamHandler()
+        sh.setFormatter(fmt)
+        root.addHandler(sh)
+
+_setup_logging()
 log = logging.getLogger("tci-bridge")
 
 _sd_checked = False
@@ -239,6 +268,7 @@ class HamlibRigController:
         self._start_lock = asyncio.Lock()
         self.connected = False
         self.status_text = "Starting..."
+        self._last_err = ""
 
     async def start(self):
         async with self._start_lock:
@@ -262,7 +292,8 @@ class HamlibRigController:
                     import ctypes
                     ctypes.CDLL("libc.so.6").prctl(1, signal.SIGTERM)
 
-            log.info(f"Launching Hamlib: {' '.join(cmd)}")
+            msg = f"Launching Hamlib: {' '.join(cmd)}"
+            if self._last_err != msg: log.info(msg)
             try:
                 self.proc = await asyncio.create_subprocess_exec(
                     *cmd,
@@ -276,21 +307,24 @@ class HamlibRigController:
                         out = (await self.proc.stdout.read()).decode(errors='ignore').strip().splitlines()
                         err = out[-1] if out else ""
                         self.status_text = f'rigctld exited: {err or "check serial port"}'
-                        log.error(self.status_text); return
+                        if self._last_err != self.status_text: log.error(self.status_text); self._last_err = self.status_text
+                        return
                     try:
                         self.reader, self.writer = await asyncio.open_connection('127.0.0.1', self.cfg.rigctld_port)
                         break
                     except OSError: continue
                 else:
                     self.status_text = 'Timed out waiting for rigctld'
-                    log.error(self.status_text); return
+                    if self._last_err != self.status_text: log.error(self.status_text); self._last_err = self.status_text
+                    return
                 self.connected = True
+                self._last_err = ""
                 self.status_text = f"Connected ({self.cfg.rig_name})"
                 log.info(self.status_text)
             except Exception as e:
                 self.connected = False
                 self.status_text = f"Connection failed: {e}"
-                log.error(self.status_text)
+                if self._last_err != self.status_text: log.error(self.status_text); self._last_err = self.status_text
 
     async def stop(self):
         self.connected = False
@@ -387,6 +421,7 @@ class TCIBridgeServer:
         self.audio_clients: Set[WebSocketServerProtocol] = set()
         self.tx_owner: Optional[WebSocketServerProtocol] = None
         self.rx_cnt = self.tx_cnt = 0
+        self._last_audio_err = ""
         self.tx_queue: asyncio.Queue[np.ndarray] = asyncio.Queue(maxsize=32)
         self.audio_dev_idx = self._resolve_audio_device(cfg.audio_device)
 
@@ -451,7 +486,7 @@ class TCIBridgeServer:
         ]
 
     async def handle_text_command(self, raw_msg: str, ws: Optional[WebSocketServerProtocol] = None):
-        log.info(f"TCI RX <- {raw_msg.strip()}")
+        log.debug(f"TCI RX <- {raw_msg.strip()}")
         for item in raw_msg.strip().split(";"):
             if not (item := item.strip()):
                 continue
@@ -598,6 +633,7 @@ class TCIBridgeServer:
             "aplay", "-q", "-D", pcm_dev, "--buffer-time=60000", "-f", "S16_LE", "-r", str(sr), "-c", "2", "-t", "raw",
             stdin=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
         )
+        self._last_audio_err = ""
         log.info(f"ALSA audio bridge running @ {sr} Hz on {pcm_dev}")
         nbytes = blocksize * 4
         silence = bytes(nbytes)
@@ -625,7 +661,8 @@ class TCIBridgeServer:
                     tx_proc.stdin.write(out_bytes)
                     await tx_proc.stdin.drain()
         except Exception as e:
-            log.warning(f"ALSA audio stream restarted: {e}")
+            msg = f"ALSA audio stream restarted: {e}"
+            if self._last_audio_err != msg: log.warning(msg); self._last_audio_err = msg
         finally:
             for proc in (rx_proc, tx_proc):
                 if proc.returncode is None:
@@ -705,7 +742,8 @@ class TCIBridgeServer:
                             self.tx_cnt = (self.tx_cnt + 1) & 0xFFFFFFFF
                             await asyncio.gather(self.tx_owner.send(chdr), return_exceptions=True)
             except Exception as e:
-                log.warning(f"Audio paused ({e}); retrying...")
+                msg = f"Audio paused ({e}); retrying..."
+                if self._last_audio_err != msg: log.warning(msg); self._last_audio_err = msg
                 self.audio_dev_idx = None
                 await asyncio.sleep(1.5)
 
